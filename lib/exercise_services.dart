@@ -8,7 +8,15 @@ class ExerciseServices {
     return ExerciseRepository().getExercises();
   }
 
-  Future<bool> addExerciseRepData(ExerciseRep repEntry) async {
-    return ExerciseRepository().insertExerciseSetData(ExerciseSet(exercise: Exercise(id: 1, name: "1", description: "1"), reps: List.empty(), id: 1, orderIndex: 2));
+  Future<bool> addExerciseSetData(ExerciseSet exerciseSet) async {
+    return ExerciseRepository().insertExerciseSetData(exerciseSet);
+  }
+
+  Future<List<ExerciseRep>> getNewestExerciseSetData(int id) async {
+    return Future.value([
+      ExerciseRep(id: 0, reps: 10, weight: 22.5, orderIndex: 0),
+      ExerciseRep(id: 1, reps: 8, weight: 22.5, orderIndex: 1),
+      ExerciseRep(id: 2, reps: 7, weight: 22.5, orderIndex: 2),
+    ]);
   }
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:workout_app/logging/logger.dart';
 import 'package:workout_app/models/exercise/exercise.dart';
@@ -8,6 +9,8 @@ import 'package:workout_app/models/exercise_set/exercise_set.dart';
 import 'package:workout_app/repositories/exercise_seeding.dart';
 
 class ExerciseRepository {
+  static final String databaseName = "workout_app.db";
+
   ExerciseRepository() {
     // try {
     //   Logger.debug("Deleting database...");
@@ -64,16 +67,12 @@ class ExerciseRepository {
 
     final exercises = exerciseMap.values.toList();
 
-    Logger.debug(
-      "Got all exercises: ${exercises.map((e) => e.name).join(", ")}",
-    );
+    Logger.debug("Got all exercises: ${exercises.map((e) => e.name).join(", ")}");
     return exercises;
   }
 
   Future<Exercise> getExercise(String exerciseId) {
-    return Future.value(
-      Exercise(id: -1, name: "N/A", description: "N/A", tags: []),
-    );
+    return Future.value(Exercise(id: -1, name: "N/A", description: "N/A", tags: []));
   }
 
   Future<bool> setExercise(Exercise exercise) {
@@ -85,34 +84,70 @@ class ExerciseRepository {
   }
 
   Future<bool> insertExerciseSetData(ExerciseSet set) async {
-    Logger.debug("Inserting ");
+    Logger.debug("Inserting exercise set ${set.toString()}");
     try {
       Database db = await _openDatabase();
 
+      Logger.debug("Inserting exercise set data for exercise ${set.exercise.name} with ${set.reps.length} reps...");
+
+      // Create the exercise set entry
       String insertExerciseSetQuery = '''
-      INSERT INTO ExerciseSet(exercise_id, order_index)
-      VALUES (?, ?)
+      INSERT INTO ${ExerciseSet.tableName} (${ExerciseSet.exerciseColumn}, ${ExerciseSet.orderIndexColumn})
+      VALUES (${set.exercise.id}, ${set.orderIndex})
       ''';
 
-      final exerciseSetId = await db.rawInsert(
-        insertExerciseSetQuery,
-        [set.exercise.id, set.orderIndex],
-      );
+      Logger.debug("Executing query: $insertExerciseSetQuery");
 
-      return false;
+      final exerciseSetId = await db.rawInsert(insertExerciseSetQuery);
 
+      Logger.debug("Inserted exercise set with id $exerciseSetId");
 
+      Logger.debug("Inserting ${set.reps.length} exercise reps for exercise set $exerciseSetId...");
+
+      // Create the exercise rep entries
+      for (final rep in set.reps) {
+        String insertExerciseRepQuery = '''
+          INSERT INTO ${ExerciseRep.tableName} (
+            ${ExerciseSet.idColumn},
+            ${ExerciseRep.repsColumn}, 
+            ${ExerciseRep.weightColumn}, 
+            ${ExerciseRep.weightUnitColumn}, 
+            ${ExerciseRep.isWarmUpColumn},
+            ${ExerciseRep.orderIndexColumn}
+          )
+          VALUES (
+            $exerciseSetId, 
+            ${rep.reps}, 
+            ${rep.weight}, 
+            ${rep.weightUnit.index}, 
+            ${rep.isWarmUp ? 1 : 0},
+            ${rep.orderIndex}
+          )
+        ''';
+
+        await db.rawInsert(insertExerciseRepQuery);
+
+        Logger.debug(
+          "Inserted exercise rep with ${rep.reps} reps and weight ${rep.weight}${rep.weightUnit} (warmup: ${rep.isWarmUp})",
+        );
+      }
+
+      Logger.debug("Inserted all exercise reps for exercise set $exerciseSetId");
+
+      db.close();
+
+      return Future.value(true);
     } on DatabaseException catch (e) {
       printDatabaseException(e);
       return Future.value(false);
     } catch (e) {
-      Logger.error(
-        "An error happened while inserting exercise-exercise-tag into database",
-        e,
-      );
+      Logger.error("An error happened while inserting exercise-exercise-tag into database", e);
       return Future.value(false);
     }
   }
+
+  @visibleForTesting
+  Future<void> getCreateExerciseTableForTest(Database db) async => _createExerciseTable(db);
 
   static Future<void> _createExerciseTable(Database db) async {
     Logger.debug("Creating database tables for Exercises...");
@@ -209,10 +244,7 @@ class ExerciseRepository {
     Logger.debug("Database tables created for rep entries");
   }
 
-  Future<int> _insertExerciseIntoDatabase(
-    Exercise exercise,
-    Database db,
-  ) async {
+  Future<int> _insertExerciseIntoDatabase(Exercise exercise, Database db) async {
     try {
       String query = """
         INSERT INTO 
@@ -235,18 +267,12 @@ class ExerciseRepository {
 
       return id;
     } catch (e) {
-      Logger.error(
-        "An error happened while inserting exercise into database",
-        e,
-      );
+      Logger.error("An error happened while inserting exercise into database", e);
       return Future.value(-1);
     }
   }
 
-  Future<int> _insertExerciseTagIntoDatabase(
-    ExerciseTag tag,
-    Database db,
-  ) async {
+  Future<int> _insertExerciseTagIntoDatabase(ExerciseTag tag, Database db) async {
     try {
       String query = """
         INSERT INTO 
@@ -267,18 +293,12 @@ class ExerciseRepository {
 
       return id;
     } catch (e) {
-      Logger.error(
-        "An error happened while inserting exercise tag into database",
-        e,
-      );
+      Logger.error("An error happened while inserting exercise tag into database", e);
       return Future.value(-1);
     }
   }
 
-  Future<int> _insertExerciseExerciseTagJunctionIntoDatabase(
-    ExerciseExerciseTagJunction junction,
-    Database db,
-  ) async {
+  Future<int> _insertExerciseExerciseTagJunctionIntoDatabase(ExerciseExerciseTagJunction junction, Database db) async {
     try {
       String query = """
         INSERT INTO 
@@ -291,9 +311,7 @@ class ExerciseRepository {
       """;
       query.trim();
 
-      Logger.debug(
-        "Inserting exercise-exercise-tag ${junction.exerciseId} : ${junction.exerciseTagId}",
-      );
+      Logger.debug("Inserting exercise-exercise-tag ${junction.exerciseId} : ${junction.exerciseTagId}");
 
       var id = await db.rawInsert(query);
 
@@ -304,27 +322,26 @@ class ExerciseRepository {
       printDatabaseException(e);
       return Future.value(-1);
     } catch (e) {
-      Logger.error(
-        "An error happened while inserting exercise-exercise-tag into database",
-        e,
-      );
+      Logger.error("An error happened while inserting exercise-exercise-tag into database", e);
       return Future.value(-1);
     }
   }
 
+  @visibleForTesting
+  Future<String> getDatabasePathForTest() => _getDatabasePath();
+
   Future<String> _getDatabasePath() async {
     var databasesPath = await getDatabasesPath();
-    databasesPath = '${databasesPath}workout_app.db';
+    databasesPath = '$databasesPath/$databaseName';
     Logger.debug("Created database path: $databasesPath");
     return databasesPath;
   }
 
+  @visibleForTesting
+  Future<Database> getDatabaseForTest() async => _openDatabase();
+
   Future<Database> _openDatabase() async {
-    return openDatabase(
-      await _getDatabasePath(),
-      version: 1,
-      onCreate: _createDatabase,
-    );
+    return openDatabase(await _getDatabasePath(), version: 1, onCreate: _createDatabase);
   }
 
   Future<void> _createDatabase(Database db, int version) async {
@@ -365,27 +382,19 @@ class ExerciseRepository {
 
       // Junctions
       for (final junction in ExerciseSeeding.exerciseExerciseTagJunctions) {
-        await txn.insert(
-          ExerciseExerciseTagJunction.tableName,
-          {
-            Exercise.idColumn: junction.exerciseId,
-            ExerciseTag.idColumn: junction.exerciseTagId,
-          },
-          conflictAlgorithm: ConflictAlgorithm.ignore,
-        );
+        await txn.insert(ExerciseExerciseTagJunction.tableName, {
+          Exercise.idColumn: junction.exerciseId,
+          ExerciseTag.idColumn: junction.exerciseTagId,
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
       }
     });
     // Count exercises
-    final exerciseCountResult = await db.rawQuery(
-      'SELECT COUNT(*) AS count FROM ${Exercise.tableName};',
-    );
+    final exerciseCountResult = await db.rawQuery('SELECT COUNT(*) AS count FROM ${Exercise.tableName};');
     final int exerciseCount = Sqflite.firstIntValue(exerciseCountResult) ?? 0;
     Logger.debug("Seeded $exerciseCount exercises. Expected 16");
 
     // Count tags
-    final tagCountResult = await db.rawQuery(
-      'SELECT COUNT(*) AS count FROM ${ExerciseTag.tableName};',
-    );
+    final tagCountResult = await db.rawQuery('SELECT COUNT(*) AS count FROM ${ExerciseTag.tableName};');
     final int tagCount = Sqflite.firstIntValue(tagCountResult) ?? 0;
     Logger.debug("Seeded $tagCount exercise tags. Expexted 32");
 
@@ -394,9 +403,7 @@ class ExerciseRepository {
       'SELECT COUNT(*) AS count FROM ${ExerciseExerciseTagJunction.tableName};',
     );
     final int junctionCount = Sqflite.firstIntValue(junctionCountResult) ?? 0;
-    Logger.debug(
-      "Seeded $junctionCount exercise-exerciseTag junctions. Expected > 80",
-    );
+    Logger.debug("Seeded $junctionCount exercise-exerciseTag junctions. Expected > 80");
 
     if (junctionCount > 80 && tagCount == 32 && exerciseCount == 16) {
       Logger.debug("Database seeded successfully!");

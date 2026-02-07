@@ -8,15 +8,15 @@ class ExerciseSet {
   static final String exerciseRepsColumn = "exercise_reps";
   static final String orderIndexColumn = "exercise_order_index";
 
-  ExerciseSet({
-    required this.exercise,
-    required this.reps,
-    required this.id,
-    required this.orderIndex,
-  });
+  ExerciseSet({this.id, required this.exercise, required this.reps, required this.orderIndex});
 
-  final int id;
+  int? id;
   final Exercise exercise;
   final List<ExerciseRep> reps;
   final int orderIndex; // Usefull for when an exercise will be integrated into a workout later
+
+  @override
+  String toString() {
+    return 'ExerciseSet{id: $id, exercise: ${exercise.name}, reps: $reps, orderIndex: $orderIndex}';
+  }
 }

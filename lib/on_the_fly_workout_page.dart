@@ -3,6 +3,7 @@ import 'package:workout_app/exercise_services.dart';
 import 'package:workout_app/logging/logger.dart';
 import 'package:workout_app/models/exercise/exercise.dart';
 import 'package:workout_app/models/exercise_set/exercise_rep.dart';
+import 'package:workout_app/models/exercise_set/exercise_set.dart';
 import 'package:workout_app/widgets/hint_checkbox_with_icon.dart';
 import 'package:workout_app/widgets/incremental_counter.dart';
 
@@ -20,6 +21,7 @@ class _OnTheFlyWorkoutPageState extends State<OnTheFlyWorkoutPage> {
   bool _startSetTimer = false;
   int _repsCount = 0;
   double _weightAmount = 0;
+  ExerciseSet? _currentExerciseSet;
 
   final List<DropdownMenuItem<String>> _weightTypeOptions = [
     DropdownMenuItem(value: "Kgs", child: Text("Kgs")),
@@ -35,6 +37,8 @@ class _OnTheFlyWorkoutPageState extends State<OnTheFlyWorkoutPage> {
 
     _weightTypeSelected = _weightTypeOptions.first.value;
     _repEntryFuture = getExerciseRepEntries();
+
+    _currentExerciseSet = ExerciseSet(exercise: widget.exercise, reps: List.empty(growable: true), orderIndex: 0);
   }
 
   @override
@@ -96,13 +100,8 @@ class _OnTheFlyWorkoutPageState extends State<OnTheFlyWorkoutPage> {
                         return CircularProgressIndicator();
                       }
 
-                      if (snapshot.hasData &&
-                          snapshot.data != null &&
-                          _repIndex < (snapshot.data?.length ?? 0)) {
-                        ExerciseRep currentRepEntry = snapshot.data!.elementAt(
-                          _repIndex,
-                        );
-
+                      if (snapshot.hasData && snapshot.data != null && _repIndex < (snapshot.data?.length ?? 0)) {
+                        ExerciseRep currentRepEntry = snapshot.data!.elementAt(_repIndex);
                         _repsCount = currentRepEntry.reps;
                         _weightAmount = currentRepEntry.weight;
                       }
@@ -112,6 +111,7 @@ class _OnTheFlyWorkoutPageState extends State<OnTheFlyWorkoutPage> {
                         _weightAmount = 0;
                       }
 
+                      // Current set display
                       return Row(
                         spacing: 5,
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -128,8 +128,7 @@ class _OnTheFlyWorkoutPageState extends State<OnTheFlyWorkoutPage> {
                             text: "Weight",
                             initialValue: _weightAmount,
                             onStepperChanged: (weight) {
-                              _weightAmount =
-                                  double.tryParse(weight.toString()) ?? 0;
+                              _weightAmount = double.tryParse(weight.toString()) ?? 0;
                             },
                           ),
                         ],
@@ -141,6 +140,9 @@ class _OnTheFlyWorkoutPageState extends State<OnTheFlyWorkoutPage> {
                     onPressed: () {
                       setState(() {
                         _repIndex++;
+                        _currentExerciseSet?.reps.add(
+                          ExerciseRep(reps: _repsCount, weight: _weightAmount, orderIndex: _repIndex),
+                        );
                         _repEntryFuture = getExerciseRepEntries();
                       });
                       Logger.debug(
@@ -151,8 +153,15 @@ class _OnTheFlyWorkoutPageState extends State<OnTheFlyWorkoutPage> {
                   ),
                   ElevatedButton(
                     onPressed: () async {
-                      await submitSetData();
-                      Navigator.of(context).pop();
+                      bool result = await submitSetData();
+                      if (result) {
+                        Navigator.of(context).pop();
+                      } else {
+                        Logger.error(
+                          "Failed to submit exercise set data",
+                          Exception("Failed to submit exercise set data"),
+                        );
+                      }
                     },
                     child: Text("Finish exercise"),
                   ),
@@ -167,17 +176,11 @@ class _OnTheFlyWorkoutPageState extends State<OnTheFlyWorkoutPage> {
   }
 
   Future<List<ExerciseRep>> getExerciseRepEntries() async {
-    await Future.delayed(Duration(seconds: 1));
-    return Future.value([
-      ExerciseRep(id: 0, reps: 10, weight: 22.5, orderIndex: 0),
-      ExerciseRep(id: 1, reps: 8, weight: 22.5, orderIndex: 1),
-      ExerciseRep(id: 2, reps: 7, weight: 22.5, orderIndex: 2),
-    ]);
+    return await ExerciseServices().getNewestExerciseSetData(widget.exercise.id);
   }
 
   Future<bool> submitSetData() async {
-    return await ExerciseServices().addExerciseRepData(
-      ExerciseRep(reps: _repsCount, weight: _weightAmount, orderIndex: _repIndex),
-    );
+    bool result = await ExerciseServices().addExerciseSetData(_currentExerciseSet!);
+    return result;
   }
 }

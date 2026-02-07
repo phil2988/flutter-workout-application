@@ -2,7 +2,7 @@ import 'package:workout_app/models/exercise_set/weight_unit.dart';
 
 class ExerciseRep {
   static final String tableName = "ExerciseRep";
-  static final String idColumn = "rep_entry_id";
+  static final String idColumn = "exercise_rep_id";
   static final String repsColumn = "reps";
   static final String weightColumn = "weight";
   static final String weightUnitColumn = WeightUnit.columnName;
@@ -42,7 +42,7 @@ class ExerciseRep {
       weightColumn: weight,
       weightUnitColumn: weightUnit,
       isWarmUpColumn: isWarmUp,
-      orderIndexColumn: orderIndex
+      orderIndexColumn: orderIndex,
     };
   }
 }
