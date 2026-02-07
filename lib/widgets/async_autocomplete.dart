@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:workout_app/exercise_services.dart';
-import 'package:workout_app/models/exercise.dart';
+import 'package:workout_app/logging/logger.dart';
+import 'package:workout_app/models/exercise/exercise.dart';
 
 const Duration debounceDuration = Duration(milliseconds: 500);
 
@@ -20,22 +21,6 @@ class AsyncAutocompleteState extends State<AsyncAutocomplete> {
   String? _currentQuery;
 
   late final _Debounceable<List<Exercise>?, String> _debouncedSearch;
-
-  // Calls the "remote" API to search with the given query. Returns null when
-  // the call has been made obsolete.
-  Future<List<Exercise>?> _search(String query) async {
-    _currentQuery = query;
-
-    final List<Exercise> options = await search(_currentQuery!);
-
-    // If another search happened after this one, throw away these options.
-    if (_currentQuery != query) {
-      return null;
-    }
-    _currentQuery = null;
-
-    return options;
-  }
 
   @override
   void initState() {
@@ -57,7 +42,10 @@ class AsyncAutocompleteState extends State<AsyncAutocomplete> {
             VoidCallback onFieldSubmitted,
           ) {
             return TextFormField(
-              decoration: InputDecoration(border: OutlineInputBorder(), hintText: "eg. Benchpress"),
+              decoration: InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: "eg. Benchpress",
+              ),
               controller: controller,
               focusNode: focusNode,
               onFieldSubmitted: (String value) {
@@ -66,7 +54,9 @@ class AsyncAutocompleteState extends State<AsyncAutocomplete> {
             );
           },
           optionsBuilder: (TextEditingValue textEditingValue) async {
-            final List<Exercise>? options = await _debouncedSearch(textEditingValue.text);
+            final List<Exercise>? options = await _debouncedSearch(
+              textEditingValue.text,
+            );
             if (options == null || options.isEmpty) {
               return [];
             }
@@ -75,11 +65,32 @@ class AsyncAutocompleteState extends State<AsyncAutocomplete> {
           },
           displayStringForOption: (option) => option.name,
           onSelected: (Exercise selection) {
+            setState(() {
+              Logger.debug("Clearing");
+              _currentQuery = "";
+            });
+
             widget.onExerciseSelected(selection);
           },
         ),
       ],
     );
+  }
+
+  // Calls the "remote" API to search with the given query. Returns null when
+  // the call has been made obsolete.
+  Future<List<Exercise>?> _search(String query) async {
+    _currentQuery = query;
+
+    final List<Exercise> options = await search(_currentQuery!);
+
+    // If another search happened after this one, throw away these options.
+    if (_currentQuery != query) {
+      return null;
+    }
+    _currentQuery = null;
+
+    return options;
   }
 
   static Future<List<Exercise>> search(String query) async {
@@ -93,9 +104,14 @@ class AsyncAutocompleteState extends State<AsyncAutocomplete> {
 
     // TODO: Optimize
     for (Exercise exercise in allExercises) {
-      for (String tag in exercise.tags) {
+      for (String tag in exercise.tags ?? []) {
         if (tag.toLowerCase().contains(query.toLowerCase())) {
           // Only add if not already added
+          if (!matchingExercises.contains(exercise)) {
+            matchingExercises.add(exercise);
+          }
+        }
+        if (exercise.name.toLowerCase().contains(query.toLowerCase())) {
           if (!matchingExercises.contains(exercise)) {
             matchingExercises.add(exercise);
           }

@@ -24,7 +24,7 @@ class _SelectExercisePageState extends State<SelectExercisePage> {
                   SizedBox(
                     width: constraints.maxWidth * 0.8,
                     child: AsyncAutocomplete(
-                      onExerciseSelected: (selectedExercise) {
+                      onExerciseSelected: (selectedExercise) async {
                         Navigator.of(context).push(
                           MaterialPageRoute(builder: (context) => OnTheFlyWorkoutPage(exercise: selectedExercise)),
                         );

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:workout_app/models/exercise.dart';
-import 'package:workout_app/models/rep_entry.dart';
+import 'package:workout_app/exercise_services.dart';
+import 'package:workout_app/logging/logger.dart';
+import 'package:workout_app/models/exercise/exercise.dart';
+import 'package:workout_app/models/exercise_set/exercise_rep.dart';
 import 'package:workout_app/widgets/hint_checkbox_with_icon.dart';
 import 'package:workout_app/widgets/incremental_counter.dart';
 
@@ -18,12 +20,13 @@ class _OnTheFlyWorkoutPageState extends State<OnTheFlyWorkoutPage> {
   bool _startSetTimer = false;
   int _repsCount = 0;
   double _weightAmount = 0;
+
   final List<DropdownMenuItem<String>> _weightTypeOptions = [
     DropdownMenuItem(value: "Kgs", child: Text("Kgs")),
     DropdownMenuItem(value: "Lbs", child: Text("Lbs")),
   ];
   String? _weightTypeSelected;
-  Future<List<RepEntry>>? _repEntryFuture;
+  Future<List<ExerciseRep>>? _repEntryFuture;
   int _repIndex = 0;
 
   @override
@@ -86,17 +89,20 @@ class _OnTheFlyWorkoutPageState extends State<OnTheFlyWorkoutPage> {
                     ],
                   ),
                   Spacer(flex: 1),
-                  FutureBuilder<List<RepEntry>>(
+                  FutureBuilder<List<ExerciseRep>>(
                     future: _repEntryFuture,
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return CircularProgressIndicator();
                       }
 
-                      if (snapshot.hasData && snapshot.data != null && _repIndex < (snapshot.data?.length ?? 0)) {
-                        RepEntry currentRepEntry = snapshot.data!.elementAt(_repIndex);
+                      if (snapshot.hasData &&
+                          snapshot.data != null &&
+                          _repIndex < (snapshot.data?.length ?? 0)) {
+                        ExerciseRep currentRepEntry = snapshot.data!.elementAt(
+                          _repIndex,
+                        );
 
-                        print("Got ${currentRepEntry.reps}x${currentRepEntry.weight}");
                         _repsCount = currentRepEntry.reps;
                         _weightAmount = currentRepEntry.weight;
                       }
@@ -122,7 +128,8 @@ class _OnTheFlyWorkoutPageState extends State<OnTheFlyWorkoutPage> {
                             text: "Weight",
                             initialValue: _weightAmount,
                             onStepperChanged: (weight) {
-                              _weightAmount = double.tryParse(weight.toString()) ?? 0;
+                              _weightAmount =
+                                  double.tryParse(weight.toString()) ?? 0;
                             },
                           ),
                         ],
@@ -136,14 +143,15 @@ class _OnTheFlyWorkoutPageState extends State<OnTheFlyWorkoutPage> {
                         _repIndex++;
                         _repEntryFuture = getExerciseRepEntries();
                       });
-                      print(
+                      Logger.debug(
                         "Exercise set stats: ${_repsCount}x$_weightAmount $_weightTypeSelected with timer: $_startSetTimer and recommended weight: $_recommendWeightIncrease",
                       );
                     },
                     child: Text("Next set"),
                   ),
                   ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
+                      await submitSetData();
                       Navigator.of(context).pop();
                     },
                     child: Text("Finish exercise"),
@@ -158,17 +166,18 @@ class _OnTheFlyWorkoutPageState extends State<OnTheFlyWorkoutPage> {
     );
   }
 
-  Future<List<RepEntry>> getExerciseRepEntries() async {
+  Future<List<ExerciseRep>> getExerciseRepEntries() async {
     await Future.delayed(Duration(seconds: 1));
     return Future.value([
-      RepEntry(reps: 10, weight: 22.5),
-      RepEntry(reps: 8, weight: 22.5),
-      RepEntry(reps: 7, weight: 22.5),
+      ExerciseRep(id: 0, reps: 10, weight: 22.5, orderIndex: 0),
+      ExerciseRep(id: 1, reps: 8, weight: 22.5, orderIndex: 1),
+      ExerciseRep(id: 2, reps: 7, weight: 22.5, orderIndex: 2),
     ]);
   }
 
-  Future<bool> submitSetData() {
-    // ExerciseServices().submitExerciseData();
-    return Future.value(false);
+  Future<bool> submitSetData() async {
+    return await ExerciseServices().addExerciseRepData(
+      ExerciseRep(reps: _repsCount, weight: _weightAmount, orderIndex: _repIndex),
+    );
   }
 }
