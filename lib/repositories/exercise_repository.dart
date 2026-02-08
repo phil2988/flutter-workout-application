@@ -147,7 +147,7 @@ class ExerciseRepository {
   }
 
   @visibleForTesting
-  Future<void> getCreateExerciseTableForTest(Database db) async => _createExerciseTable(db);
+  Future<void> testCreateExerciseTable(Database db) async => _createExerciseTable(db);
 
   static Future<void> _createExerciseTable(Database db) async {
     Logger.debug("Creating database tables for Exercises...");
@@ -200,6 +200,9 @@ class ExerciseRepository {
     Logger.debug("Created exercise tables!");
   }
 
+  @visibleForTesting
+  Future<void> testCreateExerciseSetTable(Database db) async => _createExerciseSetTable(db);
+
   static Future<void> _createExerciseSetTable(Database db) async {
     Logger.debug("Creating database tables for rep entries...");
 
@@ -244,6 +247,7 @@ class ExerciseRepository {
     Logger.debug("Database tables created for rep entries");
   }
 
+  /*
   Future<int> _insertExerciseIntoDatabase(Exercise exercise, Database db) async {
     try {
       String query = """
@@ -326,9 +330,10 @@ class ExerciseRepository {
       return Future.value(-1);
     }
   }
+  */
 
   @visibleForTesting
-  Future<String> getDatabasePathForTest() => _getDatabasePath();
+  Future<String> testGetDatabasePath() => _getDatabasePath();
 
   Future<String> _getDatabasePath() async {
     var databasesPath = await getDatabasesPath();
@@ -338,7 +343,7 @@ class ExerciseRepository {
   }
 
   @visibleForTesting
-  Future<Database> getDatabaseForTest() async => _openDatabase();
+  Future<Database> testOpenDatabase() async => _openDatabase();
 
   Future<Database> _openDatabase() async {
     return openDatabase(await _getDatabasePath(), version: 1, onCreate: _createDatabase);
@@ -359,9 +364,10 @@ class ExerciseRepository {
     }
   }
 
-  Future<void> _seedDatabase(Database db) async {
-    Logger.debug("Seeding database...");
+  @visibleForTesting
+  Future<void> testSeedDatabase(Database db) async => _seedDatabase(db);
 
+  Future<void> _seedDatabase(Database db) async {
     await db.transaction((txn) async {
       // Exercises
       for (final exercise in ExerciseSeeding.exercises) {
@@ -388,33 +394,9 @@ class ExerciseRepository {
         }, conflictAlgorithm: ConflictAlgorithm.ignore);
       }
     });
-    // Count exercises
-    final exerciseCountResult = await db.rawQuery('SELECT COUNT(*) AS count FROM ${Exercise.tableName};');
-    final int exerciseCount = Sqflite.firstIntValue(exerciseCountResult) ?? 0;
-    Logger.debug("Seeded $exerciseCount exercises. Expected 16");
-
-    // Count tags
-    final tagCountResult = await db.rawQuery('SELECT COUNT(*) AS count FROM ${ExerciseTag.tableName};');
-    final int tagCount = Sqflite.firstIntValue(tagCountResult) ?? 0;
-    Logger.debug("Seeded $tagCount exercise tags. Expexted 32");
-
-    // Count junction rows
-    final junctionCountResult = await db.rawQuery(
-      'SELECT COUNT(*) AS count FROM ${ExerciseExerciseTagJunction.tableName};',
-    );
-    final int junctionCount = Sqflite.firstIntValue(junctionCountResult) ?? 0;
-    Logger.debug("Seeded $junctionCount exercise-exerciseTag junctions. Expected > 80");
-
-    if (junctionCount > 80 && tagCount == 32 && exerciseCount == 16) {
-      Logger.debug("Database seeded successfully!");
-      return;
-    }
-
-    Logger.error("Seeding of database went wrong", Object());
   }
 
   Future<List<Map<String, Object?>>> _queryDatabase(String query) async {
-    // try {
     query.trim();
 
     Database db = await _openDatabase();
@@ -424,10 +406,6 @@ class ExerciseRepository {
     db.close();
 
     return result;
-    // } catch (e) {
-    // Logger.error("An error happened quering database!", e);
-    // return Future.value(List.of([]));
-    // }
   }
 
   void printDatabaseException(DatabaseException e) {
